@@ -2,7 +2,6 @@
 
 #include "gui/Starfield.hpp"
 #include "scanner/MemoryScanner.hpp"
-#include "scanner/ExternalMacroScanner.hpp"
 #include "scanner/ProcessEnumerator.hpp"
 
 #include <memory>
@@ -28,11 +27,6 @@ private:
         Finished
     };
 
-    enum class ScanType {
-        Memory,
-        ExternalMacro
-    };
-
     void DrawMainWindow(float dt);
     void DrawScanningWindow(float dt);
     void DrawFinishedWindow(float dt);
@@ -46,12 +40,9 @@ private:
     GLFWwindow* m_window{nullptr};
     Starfield m_starfield;
     scanner::MemoryScanner m_scanner;
-    scanner::ExternalMacroScanner m_macroScanner;
     std::vector<scanner::ProcessInfo> m_processes;
     int m_selectedProcess{-1};
     bool m_deepScan{false};
-    ScanType m_scanType{ScanType::Memory};
-    bool m_privateResults{false};
     ViewState m_view{ViewState::Main};
     float m_finishedTimer{6.0f};
     std::string m_lastError;

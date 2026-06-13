@@ -1,0 +1,13 @@
+{
+  "name": "hunt-scanner",
+  "version-string": "1.0.0",
+  "dependencies": [
+    {
+      "name": "imgui",
+      "features": ["glfw-binding", "opengl3-binding"]
+    },
+    "glfw3",
+    "curl",
+    "nlohmann-json"
+  ]
+}

@@ -1,0 +1,21 @@
+# Build directories
+build-static/
+build/
+build-*/
+
+# vcpkg
+vcpkg/
+vcpkg_installed/
+
+# IDE
+.vs/
+.vscode/
+*.vcxproj
+*.vcxproj.filters
+*.sln
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db

@@ -77,7 +77,7 @@ static std::string JoinAddresses(const std::vector<uintptr_t>& addresses) {
     return oss.str();
 }
 
-}
+} // end anonymous namespace
 
 std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::string& outPath) {
     std::ostringstream detectsRows;
@@ -198,8 +198,7 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         "--text:#ebeaf8;--muted:#8888a0;--accent:#d0d0e0;--accent2:#e8e8f0;"
         "--red:#e05555;--yellow:#c8b040;--blue:#5588d8;--green:#40c070;}"
         "html,body{height:100%;margin:0;}"
-        "body{color:var(--text);font-family:Segoe UI,Arial,sans-serif;overflow:hidden;"
-        "background:#000000;}"
+        "body{color:var(--text);font-family:Segoe UI,Arial,sans-serif;overflow:hidden;background:#000000;}"
         "#bg{position:fixed;inset:0;z-index:0;}"
         ".vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(1100px 750px at 50% 30%, rgba(0,0,0,0) 0%, rgba(0,0,0,.35) 60%, rgba(0,0,0,.82) 100%);}"
         ".app{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;}"
@@ -223,17 +222,15 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         ".main-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}"
         ".main h2{margin:0;font-size:18px;letter-spacing:.2px;}"
         ".meta{color:var(--muted);font-size:12.5px;line-height:1.35;}"
-        ".logs{display:block;max-height:58vh;overflow:auto;padding:32px 12px;}"
+        ".logs{display:flex;flex-direction:column;gap:12px;max-height:58vh;overflow:auto;padding:20px 12px;}"
         ".logs::-webkit-scrollbar{width:10px;}.logs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:999px;border:2px solid rgba(4,4,4,.75);}.logs::-webkit-scrollbar-track{background:rgba(0,0,0,.25);border-radius:999px;}"
-        ".logs{display:flex;flex-direction:column;gap:52px;}"
-
         ".log-row{"
-        "display:flex;align-items:center;gap:14px;padding:16px 28px;"
+        "display:flex;align-items:center;gap:14px;padding:14px 24px;"
         "border-radius:9999px;border:1px solid rgba(255,255,255,.12);"
         "background:rgba(12,12,12,.90);"
         "cursor:pointer;transition:all .25s ease;"
         "position:relative;overflow:hidden;"
-        "margin-bottom:8px;"
+        "margin-bottom:6px;"
         "}"
         ".log-row:hover{"
         "background:rgba(28,28,28,.96);"
@@ -245,7 +242,6 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         "opacity:0;transition:opacity .3s;pointer-events:none;border-radius:9999px;"
         "}"
         ".log-row:hover::before{opacity:1;}"
-
         ".time{color:#b0b0c8;font-family:Consolas,ui-monospace,Menlo,monospace;font-size:12px;opacity:.9;}"
         ".dot{width:11px;height:11px;border-radius:50%;display:inline-block;box-shadow:0 0 14px rgba(0,0,0,.3);}"
         ".log-row.cat-detect .dot{background:var(--red);box-shadow:0 0 20px rgba(200,80,80,.5);}"
@@ -254,7 +250,6 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         ".log-row.cat-system .dot{background:var(--green);box-shadow:0 0 18px rgba(60,190,100,.4);}"
         ".log-row.cat-bypass .dot{background:#9f7bff;box-shadow:0 0 18px rgba(159,123,255,.4);}"
         ".msg{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;}"
-
         ".critical{margin-top:8px;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:linear-gradient(180deg, rgba(22,22,22,.92), rgba(12,12,12,.78));box-shadow:0 0 32px rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.06);}"
         ".critical-title{font-weight:900;color:#e8e8f8;letter-spacing:.7px;margin-bottom:6px;}"
         ".critical-body{color:#c8c8d8;font-size:13px;}"
@@ -397,4 +392,4 @@ void OpenInDefaultBrowser(const std::string& path) {
     ShellExecuteA(nullptr, "open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
-}
+} // end of namespace report

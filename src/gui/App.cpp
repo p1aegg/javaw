@@ -145,10 +145,10 @@ bool JavaApp::Toggle(const char* label, bool* value) {
     if (clicked) *value = !*value;
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    const ImU32 bg = *value ? IM_COL32(232, 72, 82, 255) : IM_COL32(80, 80, 100, 255);
+    const ImU32 bg = *value ? IM_COL32(60, 60, 60, 255) : IM_COL32(30, 30, 30, 255);
     if (*value)
         dl->AddRectFilled(ImVec2(p.x - 1, p.y - 1), ImVec2(p.x + tw + 1, p.y + th + 1),
-                          IM_COL32(232, 72, 82, 40), th * 0.5f);
+                          IM_COL32(180, 180, 180, 30), th * 0.5f);
     dl->AddRectFilled(p, ImVec2(p.x + tw, p.y + th), bg, th * 0.5f);
     const float cx = *value ? (p.x + tw - th * 0.5f) : (p.x + th * 0.5f);
     dl->AddCircleFilled(ImVec2(cx, p.y + th * 0.5f), th * 0.34f, IM_COL32(255, 255, 255, 255));
@@ -171,7 +171,7 @@ void JavaApp::DrawTitleBar() {
     const ImVec2 wp = ImGui::GetWindowPos();
 
     ImGui::SetCursorPos(ImVec2(10.0f, 7.0f));
-    ImGui::TextColored(ImVec4(0.45f, 0.44f, 0.54f, 1.0f), "v1.4");
+    ImGui::TextColored(ImVec4(0.45f, 0.44f, 0.54f, 1.0f), "v1.5");
 
     ImGui::SetWindowFontScale(1.06f);
     const char*  title = "P1AE javaw";
@@ -182,13 +182,13 @@ void JavaApp::DrawTitleBar() {
 
     dl->AddLine(ImVec2(wp.x + 6.0f, wp.y + 26.0f),
                 ImVec2(wp.x + ws.x - 6.0f, wp.y + 26.0f),
-                IM_COL32(255, 92, 92, 35), 1.0f);
+                IM_COL32(180, 180, 180, 30), 1.0f);
 
     const ImVec2 minPos(ws.x - 46.0f, 6.0f);
     const ImVec2 minMax(minPos.x + 16.0f, minPos.y + 14.0f);
     const bool   minHov = ImGui::IsMouseHoveringRect(minPos, minMax, false);
     dl->AddRectFilled(minPos, minMax,
-        minHov ? IM_COL32(140, 42, 58, 255) : IM_COL32(100, 30, 42, 200), 3.0f);
+        minHov ? IM_COL32(70, 70, 70, 255) : IM_COL32(40, 40, 40, 200), 3.0f);
     dl->AddText(ImVec2(minPos.x + 5.0f, minPos.y + 0.5f), IM_COL32(210, 210, 245, 220), "-");
 
     ImGui::SetCursorScreenPos(minPos);
@@ -199,7 +199,7 @@ void JavaApp::DrawTitleBar() {
     const ImVec2 closeMax(closePos.x + 16.0f, closePos.y + 14.0f);
     const bool   closeHov = ImGui::IsMouseHoveringRect(closePos, closeMax, false);
     dl->AddRectFilled(closePos, closeMax,
-        closeHov ? IM_COL32(200, 50, 66, 255) : IM_COL32(130, 38, 52, 200), 3.0f);
+        closeHov ? IM_COL32(80, 80, 80, 255) : IM_COL32(40, 40, 40, 200), 3.0f);
     dl->AddText(ImVec2(closePos.x + 4.5f, closePos.y + 0.5f), IM_COL32(210, 210, 245, 220), "x");
 
     ImGui::SetCursorScreenPos(closePos);
@@ -243,10 +243,11 @@ void JavaApp::DrawMainWindow(float dt) {
     {
         const ImVec2 cp = ImGui::GetWindowPos();
         ImDrawList*  dl = ImGui::GetWindowDrawList();
-        dl->AddRectFilled(cp, ImVec2(cp.x + cardSz.x, cp.y + cardSz.y), IM_COL32(24, 8, 10, 120), 9.0f);
-        dl->AddRect(cp, ImVec2(cp.x + cardSz.x, cp.y + cardSz.y), IM_COL32(255, 92, 92, 54), 9.0f, 0, 1.0f);
+        dl->AddRectFilled(cp, ImVec2(cp.x + cardSz.x, cp.y + cardSz.y), IM_COL32(0, 0, 0, 220), 9.0f);
+        dl->AddRectFilled(ImVec2(cp.x + 1.0f, cp.y + 1.0f), ImVec2(cp.x + cardSz.x - 1.0f, cp.y + cardSz.y - 1.0f), IM_COL32(18, 18, 18, 120), 9.0f);
+        dl->AddRect(cp, ImVec2(cp.x + cardSz.x, cp.y + cardSz.y), IM_COL32(255, 255, 255, 50), 9.0f, 0, 1.0f);
         dl->AddRect(cp, ImVec2(cp.x + cardSz.x, cp.y + cardSz.y),
-                    IM_COL32(255, 92, 92, static_cast<int>(28 * pulse)), 9.0f, 0, 2.2f);
+                    IM_COL32(255, 255, 255, static_cast<int>(18 * pulse)), 9.0f, 0, 2.2f);
     }
 
     const float padX    = 10.0f;
@@ -292,9 +293,9 @@ void JavaApp::DrawMainWindow(float dt) {
 
     const float refreshBtnW = 80.0f;
     ImGui::SetCursorPosX(cardSz.x - padX - refreshBtnW);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.70f, 0.25f, 0.30f, 0.75f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.32f, 0.38f, 0.85f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.70f, 0.25f, 0.30f, 0.95f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.12f, 0.12f, 0.90f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.06f, 0.06f, 0.06f, 1.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 3.0f));
     if (ImGui::Button("Refresh##ref", ImVec2(refreshBtnW, 0)))
         RefreshProcesses();
@@ -307,7 +308,7 @@ void JavaApp::DrawMainWindow(float dt) {
         const float  dy = ImGui::GetCursorPosY() + 3.0f;
         dl->AddLine(ImVec2(wp.x + padX, wp.y + dy),
                     ImVec2(wp.x + cardSz.x - padX, wp.y + dy),
-                    IM_COL32(255, 92, 92, 28), 1.0f);
+                    IM_COL32(180, 180, 180, 22), 1.0f);
     }
     ImGui::Dummy(ImVec2(0, 6.0f));
 
@@ -323,7 +324,7 @@ void JavaApp::DrawMainWindow(float dt) {
 
         dl->AddLine(ImVec2(wp.x + padX, wp.y + bottomY - 3.0f),
                     ImVec2(wp.x + cardSz.x - padX, wp.y + bottomY - 3.0f),
-                    IM_COL32(255, 92, 92, 28), 1.0f);
+                    IM_COL32(180, 180, 180, 22), 1.0f);
 
         ImGui::SetCursorPos(ImVec2(padX, bottomY - 24.0f));
         Toggle("Deep Scan (BETA)", &m_deepScan);
@@ -335,14 +336,14 @@ void JavaApp::DrawMainWindow(float dt) {
         const ImVec2 btnSz(contentW, 22.0f);
 
         if (!processSelected) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.24f, 0.16f, 0.18f, 0.55f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.16f, 0.18f, 0.55f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.24f, 0.16f, 0.18f, 0.55f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.08f, 0.08f, 0.08f, 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.08f, 0.08f, 0.08f, 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.08f, 0.08f, 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
         } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.70f, 0.25f, 0.30f, 0.75f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.32f, 0.38f, 0.85f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.70f, 0.25f, 0.30f, 0.95f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.14f, 0.14f, 0.90f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.22f, 0.22f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));
         }
 
         if (ImGui::Button("START SCAN", btnSz)) StartScan();
@@ -378,23 +379,23 @@ void JavaApp::DrawScanningWindow(float dt) {
     const ImVec2 cBR(cTL.x + cardSz.x, cTL.y + cardSz.y);
 
     const float pulse = 0.72f + 0.28f * std::sin(static_cast<float>(glfwGetTime()) * 2.1f);
-    dl->AddRectFilled(cTL, cBR, IM_COL32(24, 8, 10, 185), 9.0f);
-    dl->AddRect(cTL, cBR, IM_COL32(255, 92, 92, 54), 9.0f, 0, 1.0f);
-    dl->AddRect(cTL, cBR, IM_COL32(255, 92, 92, static_cast<int>(28 * pulse)), 9.0f, 0, 2.2f);
+    dl->AddRectFilled(cTL, cBR, IM_COL32(0, 0, 0, 80), 9.0f);
+    dl->AddRect(cTL, cBR, IM_COL32(255, 255, 255, 40), 9.0f, 0, 1.0f);
+    dl->AddRect(cTL, cBR, IM_COL32(255, 255, 255, static_cast<int>(18 * pulse)), 9.0f, 0, 2.2f);
 
     dl->AddLine(ImVec2(cTL.x + 12.0f, cTL.y + 30.0f),
                 ImVec2(cBR.x - 12.0f, cTL.y + 30.0f),
-                IM_COL32(255, 92, 92, 32), 1.0f);
+                IM_COL32(180, 180, 180, 25), 1.0f);
 
     const float  barPad = 16.0f;
     const ImVec2 bTL(cTL.x + barPad, cTL.y + 40.0f);
     const ImVec2 bBR(cBR.x - barPad, bTL.y + 7.0f);
 
-    dl->AddRectFilled(bTL, bBR, IM_COL32(80, 48, 58, 170), 3.0f);
-    dl->AddRect(bTL, bBR, IM_COL32(255, 92, 92, 80), 3.0f, 0, 1.0f);
+    dl->AddRectFilled(bTL, bBR, IM_COL32(30, 30, 30, 200), 3.0f);
+    dl->AddRect(bTL, bBR, IM_COL32(160, 160, 160, 60), 3.0f, 0, 1.0f);
     const float fw = (bBR.x - bTL.x) * progress;
     if (fw > 0.0f) {
-        dl->AddRectFilled(bTL, ImVec2(bTL.x + fw, bBR.y), IM_COL32(255, 132, 132, 240), 3.0f);
+        dl->AddRectFilled(bTL, ImVec2(bTL.x + fw, bBR.y), IM_COL32(220, 220, 230, 230), 3.0f);
         const float sc = bTL.x + std::fmod(static_cast<float>(glfwGetTime()) * 110.0f, std::max(1.0f, fw));
         const float sl = std::max(bTL.x, sc - 9.0f);
         const float sr = std::min(bTL.x + fw, sc + 7.0f);
@@ -439,9 +440,9 @@ void JavaApp::DrawFinishedWindow(float dt) {
     const ImVec2 cBR(cTL.x + cardSz.x, cTL.y + cardSz.y);
 
     const float pulse = 0.72f + 0.28f * std::sin(static_cast<float>(glfwGetTime()) * 2.1f);
-    dl->AddRectFilled(cTL, cBR, IM_COL32(24, 8, 10, 195), 9.0f);
-    dl->AddRect(cTL, cBR, IM_COL32(255, 92, 92, 54), 9.0f, 0, 1.0f);
-    dl->AddRect(cTL, cBR, IM_COL32(255, 92, 92, static_cast<int>(28 * pulse)), 9.0f, 0, 2.2f);
+    dl->AddRectFilled(cTL, cBR, IM_COL32(0, 0, 0, 80), 9.0f);
+    dl->AddRect(cTL, cBR, IM_COL32(255, 255, 255, 40), 9.0f, 0, 1.0f);
+    dl->AddRect(cTL, cBR, IM_COL32(255, 255, 255, static_cast<int>(18 * pulse)), 9.0f, 0, 2.2f);
 
     {
         ImGui::SetWindowFontScale(1.12f);
@@ -454,7 +455,7 @@ void JavaApp::DrawFinishedWindow(float dt) {
 
     dl->AddLine(ImVec2(cTL.x + 12.0f, cTL.y + 38.0f),
                 ImVec2(cBR.x - 12.0f, cTL.y + 38.0f),
-                IM_COL32(255, 92, 92, 32), 1.0f);
+                IM_COL32(180, 180, 180, 25), 1.0f);
 
     {
         const char*  b  = "The scan completed successfully.";
@@ -473,7 +474,7 @@ void JavaApp::DrawFinishedWindow(float dt) {
 
     dl->AddLine(ImVec2(cTL.x + 12.0f, cTL.y + 80.0f),
                 ImVec2(cBR.x - 12.0f, cTL.y + 80.0f),
-                IM_COL32(255, 92, 92, 25), 1.0f);
+                IM_COL32(180, 180, 180, 20), 1.0f);
 
     {
         const float  p    = std::clamp(1.0f - (m_finishedTimer / 6.0f), 0.0f, 1.0f);
@@ -481,11 +482,11 @@ void JavaApp::DrawFinishedWindow(float dt) {
         const ImVec2 a(cTL.x + bPad, cTL.y + 88.0f);
         const ImVec2 b(cBR.x - bPad, a.y + 7.0f);
 
-        dl->AddRectFilled(a, b, IM_COL32(60, 46, 52, 170), 3.0f);
-        dl->AddRect(a, b, IM_COL32(255, 92, 92, 80), 3.0f, 0, 1.0f);
+        dl->AddRectFilled(a, b, IM_COL32(30, 30, 30, 200), 3.0f);
+        dl->AddRect(a, b, IM_COL32(160, 160, 160, 60), 3.0f, 0, 1.0f);
         const float fw = (b.x - a.x) * p;
         if (fw > 0.0f) {
-            dl->AddRectFilled(a, ImVec2(a.x + fw, b.y), IM_COL32(255, 132, 132, 235), 3.0f);
+            dl->AddRectFilled(a, ImVec2(a.x + fw, b.y), IM_COL32(210, 210, 220, 230), 3.0f);
             const float sc = a.x + std::fmod(static_cast<float>(glfwGetTime()) * 85.0f, std::max(1.0f, fw));
             const float sl = std::max(a.x, sc - 9.0f);
             const float sr = std::min(a.x + fw, sc + 6.0f);

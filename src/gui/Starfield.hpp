@@ -9,22 +9,21 @@ namespace gui {
 
 class Starfield {
 public:
+    struct Particle {
+        float x, y;
+        float vx, vy;
+    };
+
     void Initialize(int width, int height);
     void Resize(int width, int height);
     void Render(ImDrawList* drawList, ImVec2 origin, ImVec2 size, float timeSeconds);
 
 private:
-    struct Star {
-        float x;
-        float y;
-        float radius;
-        float twinkle;
-        float speed;
-    };
-
-    std::vector<Star> m_stars;
-    int m_width{1280};
-    int m_height{720};
+    std::vector<Particle> m_particles;
+    int   m_width{1280};
+    int   m_height{720};
+    float m_lastTime{0.0f};
+    bool  m_initialized{false};
 };
 
 }

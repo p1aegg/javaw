@@ -29,6 +29,23 @@ bool IsSystemIntegrityDetection(const std::string& message) {
            lower.find("(system tampering)") != std::string::npos;
 }
 
+bool IsBypassDetection(const std::string& message) {
+    std::string lower = message;
+    for (auto& ch : lower) ch = static_cast<char>(tolower(static_cast<unsigned char>(ch)));
+    static const std::vector<std::string> patterns = {
+        "-dfabric.", "-dforge.", "-dfml.", "-dquilt.",
+        "-djava.security.manager=", "-djava.security.policy=", "-xbootclasspath",
+        "-xx:+enabledynamicagentloading", "-dclient.brand=", "-dlauncher.brand=",
+        "-dfabric.launcher.brand=", "-dfabric.launcher.name="
+    };
+    for (const auto& pattern : patterns) {
+        if (lower.find(pattern) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static std::string EscapeHtml(const std::string& s) {
     std::string out;
     out.reserve(s.size() + 16);
@@ -64,6 +81,7 @@ static std::string JoinAddresses(const std::vector<uintptr_t>& addresses) {
 
 std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::string& outPath) {
     std::ostringstream detectsRows;
+    std::ostringstream bypassRows;
     std::ostringstream warningRows;
     std::ostringstream suspiciousRows;
     std::ostringstream systemIntegrityRows;
@@ -121,8 +139,15 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
 
     int detectionId = 1;
     for (const auto& d : sortedDetections) {
+        std::string categoryClass;
+        if (d.severity == scanner::Severity::Detect)      categoryClass = "cat-detect";
+        else if (IsBypassDetection(d.message))             categoryClass = "cat-bypass";
+        else if (IsSystemIntegrityDetection(d.message))    categoryClass = "cat-system";
+        else if (d.severity == scanner::Severity::Warning) categoryClass = "cat-warning";
+        else                                               categoryClass = "cat-suspicious";
+
         std::ostringstream row;
-        row << "<div class='log-row " << SeverityClass(d.severity) << "'"
+        row << "<div class='log-row " << SeverityClass(d.severity) << " " << categoryClass << "'"
             << " data-id='" << detectionId << "'"
             << " data-sev='" << SeverityClass(d.severity) << "'"
             << " data-hits='" << d.totalHits << "'"
@@ -137,6 +162,7 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
             << "</div>\n";
 
         if (d.severity == scanner::Severity::Detect) detectsRows << row.str();
+        else if (IsBypassDetection(d.message)) bypassRows << row.str();
         else if (d.severity == scanner::Severity::Warning) warningRows << row.str();
         else if (IsSystemIntegrityDetection(d.message)) systemIntegrityRows << row.str();
         else suspiciousRows << row.str();
@@ -150,8 +176,10 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         ++detectionId;
     }
 
+    int bypassCount = 0;
     int suspiciousCountExcludingSystem = 0;
     for (const auto& d : sortedDetections) {
+        if (IsBypassDetection(d.message)) bypassCount += d.totalHits;
         if (d.severity == scanner::Severity::Suspicious && !IsSystemIntegrityDetection(d.message))
             suspiciousCountExcludingSystem += d.totalHits;
     }
@@ -159,56 +187,57 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
     for (const auto& d : sortedDetections) {
         if (IsSystemIntegrityDetection(d.message)) systemIntegrityCount += d.totalHits;
     }
+    int warningCountExcludingBypass = std::max<int>(0, static_cast<int>(summary.warningCount) - bypassCount);
 
     const std::string html =
         "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'/>"
         "<title>P1AE javaw - Detection Results</title>"
         "<style>"
-        ":root{--bg0:#22080d;--bg1:#3a0f16;--glass:rgba(45,12,16,.78);--glass2:rgba(32,9,12,.68);"
-        "--border:rgba(255,85,85,.32);--border2:rgba(255,92,92,.12);"
-        "--text:#f3f2ff;--muted:#b8b0d0;--accent:#ff5c5c;--accent2:#ff3344;"
-        "--red:#ff4d4d;--yellow:#f2b233;--blue:#55a7ff;--green:#3ee28c;}"
+        ":root{--bg0:#000000;--bg1:#0a0a0a;--glass:rgba(10,10,10,.88);--glass2:rgba(6,6,6,.82);"
+        "--border:rgba(255,255,255,.25);--border2:rgba(255,255,255,.08);"
+        "--text:#ebeaf8;--muted:#8888a0;--accent:#d0d0e0;--accent2:#e8e8f0;"
+        "--red:#e05555;--yellow:#c8b040;--blue:#5588d8;--green:#40c070;}"
         "html,body{height:100%;margin:0;}"
         "body{color:var(--text);font-family:Segoe UI,Arial,sans-serif;overflow:hidden;"
-        "background:radial-gradient(1600px 950px at 50% 15%, #6b1f2a 0%, var(--bg1) 38%, var(--bg0) 100%);}"
+        "background:#000000;}"
         "#bg{position:fixed;inset:0;z-index:0;}"
-        ".vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(1100px 750px at 50% 30%, rgba(0,0,0,0) 0%, rgba(0,0,0,.28) 60%, rgba(0,0,0,.75) 100%);}"
+        ".vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(1100px 750px at 50% 30%, rgba(0,0,0,0) 0%, rgba(0,0,0,.35) 60%, rgba(0,0,0,.82) 100%);}"
         ".app{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;}"
         ".top{display:flex;align-items:center;justify-content:space-between;padding:22px 30px;}"
-        ".brand-center{font-weight:800;letter-spacing:7px;font-size:44px;color:var(--accent2);text-shadow:0 0 22px rgba(255,47,61,.45),0 0 45px rgba(150,15,25,.35);}"
+        ".brand-center{font-weight:800;letter-spacing:7px;font-size:44px;color:var(--accent2);text-shadow:0 0 22px rgba(255,255,255,.25),0 0 45px rgba(180,180,200,.18);}"
         ".top-right,.top-left{color:var(--accent);font-weight:700;opacity:.95;}"
         ".wrap{flex:1;display:flex;align-items:flex-start;gap:18px;padding:0 22px 22px 22px;min-height:0;}"
-        ".card{background:linear-gradient(180deg,var(--glass),var(--glass2));border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(12px);box-shadow:0 0 0 1px var(--border2), 0 0 40px rgba(255,92,92,.15);}"
+        ".card{background:linear-gradient(180deg,var(--glass),var(--glass2));border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(12px);box-shadow:0 0 0 1px var(--border2), 0 0 40px rgba(255,255,255,.06);}"
         ".left{width:295px;padding:18px;display:flex;flex-direction:column;gap:10px;align-self:flex-start;height:max-content;}"
         ".left h2{margin:4px 0 0 0;font-size:18px;letter-spacing:.2px;}"
         ".sub{color:var(--muted);font-size:12.5px;line-height:1.35;}"
         ".tabs{margin-top:6px;display:flex;flex-direction:column;gap:10px;}"
-        ".tab{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;padding:12px 12px;border-radius:12px;border:1px solid rgba(255,92,92,.16);background:rgba(22,7,10,.58);transition:all .18s;}"
-        ".tab:hover{transform:scale(1.01);box-shadow:0 0 18px rgba(255,92,92,.30);border-color:rgba(255,92,92,.28);}"
-        ".tab.active{background:rgba(52,16,22,.62);border-color:rgba(255,92,92,.40);box-shadow:0 0 26px rgba(255,92,92,.34);}"
+        ".tab{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(14,14,14,.72);transition:all .18s;}"
+        ".tab:hover{transform:scale(1.01);box-shadow:0 0 18px rgba(255,255,255,.10);border-color:rgba(255,255,255,.22);}"
+        ".tab.active{background:rgba(28,28,28,.82);border-color:rgba(255,255,255,.30);box-shadow:0 0 26px rgba(255,255,255,.12);}"
         ".tab .label{display:flex;align-items:center;gap:10px;font-size:13px;}"
-        ".pill{min-width:34px;text-align:center;font-weight:800;border-radius:10px;padding:3px 8px;background:rgba(255,92,92,.12);border:1px solid rgba(255,92,92,.22);}"
+        ".pill{min-width:34px;text-align:center;font-weight:800;border-radius:10px;padding:3px 8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);}"
         ".ico{width:10px;height:10px;border-radius:50%;}"
-        ".ico.detect{background:var(--red);}.ico.warning{background:var(--yellow);}.ico.suspicious{background:var(--blue);}.ico.system{background:var(--green);}"
+        ".ico.detect{background:var(--red);}.ico.warning{background:var(--yellow);}.ico.suspicious{background:var(--blue);}.ico.system{background:var(--green);}.ico.bypass{background:#9f7bff;}"
         ".main{flex:1;min-width:0;align-self:flex-start;height:max-content;padding:18px;display:flex;flex-direction:column;gap:10px;}"
         ".main-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}"
         ".main h2{margin:0;font-size:18px;letter-spacing:.2px;}"
         ".meta{color:var(--muted);font-size:12.5px;line-height:1.35;}"
         ".logs{display:block;max-height:58vh;overflow:auto;padding:32px 12px;}"
-        ".logs::-webkit-scrollbar{width:10px;}.logs::-webkit-scrollbar-thumb{background:rgba(255,92,92,.22);border-radius:999px;border:2px solid rgba(9,3,4,.75);}.logs::-webkit-scrollbar-track{background:rgba(0,0,0,.25);border-radius:999px;}"
-        ".logs{display:flex;flex-direction:column;gap:52px;}"   /* Very strong spacing */
+        ".logs::-webkit-scrollbar{width:10px;}.logs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:999px;border:2px solid rgba(4,4,4,.75);}.logs::-webkit-scrollbar-track{background:rgba(0,0,0,.25);border-radius:999px;}"
+        ".logs{display:flex;flex-direction:column;gap:52px;}"
 
         ".log-row{"
         "display:flex;align-items:center;gap:14px;padding:16px 28px;"
-        "border-radius:9999px;border:1px solid rgba(255,92,92,.20);"
-        "background:rgba(26,9,12,.90);"
+        "border-radius:9999px;border:1px solid rgba(255,255,255,.12);"
+        "background:rgba(12,12,12,.90);"
         "cursor:pointer;transition:all .25s ease;"
         "position:relative;overflow:hidden;"
-        "margin-bottom:8px;"   /* Extra safety margin */
+        "margin-bottom:8px;"
         "}"
         ".log-row:hover{"
-        "background:rgba(58,17,22,.96);"
-        "border-color:rgba(255,92,92,.58);"
+        "background:rgba(28,28,28,.96);"
+        "border-color:rgba(255,255,255,.35);"
         "}"
         ".log-row::before{"
         "content:'';position:absolute;inset:0;"
@@ -217,25 +246,27 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         "}"
         ".log-row:hover::before{opacity:1;}"
 
-        ".time{color:#d7d4ff;font-family:Consolas,ui-monospace,Menlo,monospace;font-size:12px;opacity:.9;}"
+        ".time{color:#b0b0c8;font-family:Consolas,ui-monospace,Menlo,monospace;font-size:12px;opacity:.9;}"
         ".dot{width:11px;height:11px;border-radius:50%;display:inline-block;box-shadow:0 0 14px rgba(0,0,0,.3);}"
-        ".log-row.detect .dot{background:var(--red);box-shadow:0 0 20px rgba(255,77,77,.5);}"
-        ".log-row.warning .dot{background:var(--yellow);box-shadow:0 0 18px rgba(242,178,51,.4);}"
-        ".log-row.suspicious .dot{background:var(--blue);box-shadow:0 0 18px rgba(85,167,255,.4);}"
+        ".log-row.cat-detect .dot{background:var(--red);box-shadow:0 0 20px rgba(200,80,80,.5);}"
+        ".log-row.cat-warning .dot{background:var(--yellow);box-shadow:0 0 18px rgba(200,180,60,.4);}"
+        ".log-row.cat-suspicious .dot{background:var(--blue);box-shadow:0 0 18px rgba(80,140,220,.4);}"
+        ".log-row.cat-system .dot{background:var(--green);box-shadow:0 0 18px rgba(60,190,100,.4);}"
+        ".log-row.cat-bypass .dot{background:#9f7bff;box-shadow:0 0 18px rgba(159,123,255,.4);}"
         ".msg{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;}"
 
-        ".critical{margin-top:8px;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,77,77,.5);background:linear-gradient(180deg, rgba(40,12,16,.92), rgba(26,10,14,.78));box-shadow:0 0 32px rgba(255,77,77,.14), inset 0 0 0 1px rgba(255,77,77,.12);}"
-        ".critical-title{font-weight:900;color:#ff8b8b;letter-spacing:.7px;margin-bottom:6px;}"
-        ".critical-body{color:#ffd7d7;font-size:13px;}"
+        ".critical{margin-top:8px;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:linear-gradient(180deg, rgba(22,22,22,.92), rgba(12,12,12,.78));box-shadow:0 0 32px rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.06);}"
+        ".critical-title{font-weight:900;color:#e8e8f8;letter-spacing:.7px;margin-bottom:6px;}"
+        ".critical-body{color:#c8c8d8;font-size:13px;}"
         ".detail-page{display:none;flex:1;min-height:0;overflow:auto;padding:6px 2px 2px 2px;}"
         ".detail-header{display:flex;align-items:center;justify-content:space-between;gap:10px;}"
-        ".back-btn{cursor:pointer;border:1px solid rgba(255,92,92,.35);background:rgba(255,92,92,.08);color:#ffd7d7;border-radius:10px;padding:7px 14px;font-weight:700;transition:all .2s ease;}"
-        ".back-btn:hover{background:rgba(255,92,92,.18);border-color:rgba(255,92,92,.6);}"
+        ".back-btn{cursor:pointer;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.05);color:#d8d8e8;border-radius:10px;padding:7px 14px;font-weight:700;transition:all .2s ease;}"
+        ".back-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.45);}"
         ".detail-grid{margin-top:12px;display:grid;grid-template-columns:180px 1fr;gap:10px;}"
         ".detail-k{color:var(--muted);font-size:12px;}"
-        ".detail-v{font-size:13px;color:#fff1f1;word-break:break-word;}"
-        ".detail-box{margin-top:10px;border:1px solid rgba(255,92,92,.2);background:rgba(35,10,14,.45);border-radius:12px;padding:12px;}"
-        ".footer{position:fixed;right:22px;bottom:18px;color:rgba(230,225,255,.75);font-size:12px;z-index:3;}"
+        ".detail-v{font-size:13px;color:#e8e8f0;word-break:break-word;}"
+        ".detail-box{margin-top:10px;border:1px solid rgba(255,255,255,.14);background:rgba(16,16,16,.55);border-radius:12px;padding:12px;}"
+        ".footer{position:fixed;right:22px;bottom:18px;color:rgba(200,200,220,.75);font-size:12px;z-index:3;}"
         "</style></head><body>"
         "<canvas id='bg'></canvas><div class='vignette'></div>"
         "<div class='app'>"
@@ -247,11 +278,12 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         "<div class='wrap'>"
         "<aside class='left card'>"
         "<h2>Detection Results</h2>"
-        "<div class='sub'>" + std::to_string(summary.detections.size()) + " events across 4 categories</div>"
+        "<div class='sub'>" + std::to_string(summary.detections.size()) + " events across 5 categories</div>"
         "<div class='tabs'>"
         "<div class='tab active' data-tab='detects'><div class='label'><span class='ico detect'></span>Detects Logs</div><div class='pill'>" + std::to_string(summary.detectCount) + "</div></div>"
         "<div class='tab' data-tab='system'><div class='label'><span class='ico system'></span>System Integrity</div><div class='pill'>" + std::to_string(systemIntegrityCount) + "</div></div>"
-        "<div class='tab' data-tab='warnings'><div class='label'><span class='ico warning'></span>Warnings Logs</div><div class='pill'>" + std::to_string(summary.warningCount) + "</div></div>"
+        "<div class='tab' data-tab='bypass'><div class='label'><span class='ico bypass'></span>Bypass Logs</div><div class='pill'>" + std::to_string(bypassCount) + "</div></div>"
+        "<div class='tab' data-tab='warnings'><div class='label'><span class='ico warning'></span>Warnings Logs</div><div class='pill'>" + std::to_string(warningCountExcludingBypass) + "</div></div>"
         "<div class='tab' data-tab='suspicious'><div class='label'><span class='ico suspicious'></span>Suspicious Logs</div><div class='pill'>" + std::to_string(suspiciousCountExcludingSystem) + "</div></div>"
         "</div>"
         "</aside>"
@@ -263,6 +295,7 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         + highlights.str() +
         "<div class='logs' id='logs_detects'>" + detectsRows.str() + "</div>"
         "<div class='logs' id='logs_system' style='display:none'>" + systemIntegrityRows.str() + "</div>"
+        "<div class='logs' id='logs_bypass' style='display:none'>" + bypassRows.str() + "</div>"
         "<div class='logs' id='logs_warnings' style='display:none'>" + warningRows.str() + "</div>"
         "<div class='logs' id='logs_suspicious' style='display:none'>" + suspiciousRows.str() + "</div>"
         "<div class='detail-page' id='detailPage'>"
@@ -283,18 +316,17 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         "</main></div>"
         "<div class='footer'></div></div>"
 
-        // (The rest of the script is the same as before - I kept it short for brevity, but use the full script from previous versions)
         "<script>"
         "(function(){"
         "const tabs=[...document.querySelectorAll('.tab')];"
         "const title=document.getElementById('tabTitle');"
         "const detailPage=document.getElementById('detailPage');"
         "const backBtn=document.getElementById('backToLogs');"
-        "const logsByTab={detects:document.getElementById('logs_detects'),system:document.getElementById('logs_system'),warnings:document.getElementById('logs_warnings'),suspicious:document.getElementById('logs_suspicious')};"
+        "const logsByTab={detects:document.getElementById('logs_detects'),system:document.getElementById('logs_system'),bypass:document.getElementById('logs_bypass'),warnings:document.getElementById('logs_warnings'),suspicious:document.getElementById('logs_suspicious')};"
         "let activeTab='detects';"
         "function showLogsOnly(){detailPage.style.display='none';Object.keys(logsByTab).forEach(k=>{logsByTab[k].style.display=(k===activeTab)?'block':'none';});}"
         "function show(tab){activeTab=tab;tabs.forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));showLogsOnly();"
-        "title.textContent=tab==='detects'?'Detects Logs':tab==='system'?'System Integrity':tab==='warnings'?'Warnings Logs':'Suspicious Logs';}"
+        "title.textContent=tab==='detects'?'Detects Logs':tab==='system'?'System Integrity':tab==='bypass'?'Bypass Logs':tab==='warnings'?'Warnings Logs':'Suspicious Logs';}"
         "tabs.forEach(t=>t.addEventListener('click',()=>show(t.dataset.tab)));"
         "if(backBtn)backBtn.addEventListener('click',showLogsOnly);"
         "document.querySelectorAll('.log-row').forEach(row=>{row.addEventListener('click',()=>{"
@@ -315,21 +347,42 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
         "const c=document.getElementById('bg');const ctx=c.getContext('2d');"
         "let w=0,h=0;"
         "function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;}window.addEventListener('resize',resize);resize();"
-        "const rnd=(a,b)=>a+Math.random()*(b-a);"
-        "const stars=[...Array(220)].map(()=>({x:rnd(0,1),y:rnd(0,1),r:rnd(.6,1.8),tw:rnd(0,6.28),sp:rnd(.08,.35)}));"
-        "const snow=[...Array(260)].map(()=>({x:rnd(0,1),y:rnd(0,1),r:rnd(1.2,3.2),v:rnd(18,52),d:rnd(4,14),p:rnd(0,6.28),a:rnd(0.35,0.85)}));"
+        "let seed=1337;"
+        "function srnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}"
+        "function srng(a,b){return a+srnd()*(b-a);}"
+        "const stars=Array.from({length:220},()=>({x:srng(0,1),y:srng(0,1),r:srng(0.7,2.2),tw:srng(0.5,2.5),sp:srng(0.1,0.5)}));"
+        "const snow=Array.from({length:180},(_,i)=>{"
+        "const sA=((i*37)%1000)/1000,sB=((i*83+19)%1000)/1000,sC=((i*29+7)%1000)/1000;"
+        "return{sA,sB,sC,v:20+sA*35,d:5+sB*10,r:0.6+sB*1.2,a:200+Math.floor(sC*55)};"
+        "});"
         "function frame(t){t/=1000;"
-        "ctx.clearRect(0,0,w,h);"
-        "ctx.fillStyle='rgb(18,6,9)';ctx.fillRect(0,0,w,h);"
+        "ctx.fillStyle='rgb(0,0,0)';ctx.fillRect(0,0,w,h);"
+        "for(let i=0;i<260;i++){"
+        "const x=(i*97+t*(0.4+(i%7)*0.03))%w;"
+        "const y=(i*53+t*(0.2+(i%5)*0.02))%h;"
+        "const a=(8+(i%9)+8)/255;"
+        "ctx.fillStyle=`rgba(200,200,210,${a})`;ctx.beginPath();ctx.arc(x,y,0.8+(i%3)*0.35,0,Math.PI*2);ctx.fill();"
+        "}"
+        "for(let i=0;i<stars.length;i+=5){"
+        "if(i+1>=stars.length)break;"
+        "const s=stars[i],n=stars[i+1];"
+        "const sx=(s.x*w+t*s.sp*7)%w,sy=(s.y*h+Math.sin(t*0.2+s.tw)*3)%h;"
+        "const nx=(n.x*w+t*n.sp*7)%w,ny=(n.y*h)%h;"
+        "ctx.strokeStyle='rgba(220,220,230,0.118)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(nx,ny);ctx.stroke();"
+        "}"
         "for(const s of stars){"
-        "const a=0.35+0.65*Math.sin(t*(0.9+s.sp)+s.tw)*0.5+0.5;"
-        "const x=(s.x*w + t*s.sp*35)%w; const y=(s.y*h + Math.sin(t*.2+s.tw)*3);"
-        "ctx.fillStyle=`rgba(255,210,210,${0.10+0.28*a})`;ctx.beginPath();ctx.arc(x,y,s.r,0,Math.PI*2);ctx.fill();"
+        "const pulse=0.55+0.45*Math.sin(t*(0.9+s.sp)+s.tw);"
+        "const alpha=Math.floor(95+150*pulse)/255;"
+        "const x=(s.x*w+t*s.sp*7)%w,y=(s.y*h+Math.sin(t*0.2+s.tw)*3)%h;"
+        "ctx.fillStyle=`rgba(255,255,255,${alpha})`;ctx.beginPath();ctx.arc(x,y,s.r,0,Math.PI*2);ctx.fill();"
         "}"
         "for(let i=0;i<snow.length;i++){const p=snow[i];"
-        "const y=(p.y*h + t*p.v)%(h+30)-15; const x=(p.x*w + Math.sin(t*(0.8+p.a)+p.p)*p.d + w)%w;"
-        "ctx.fillStyle=`rgba(255,170,170,${p.a})`;ctx.beginPath();ctx.arc(x,y,p.r,0,Math.PI*2);ctx.fill();"
-        "ctx.fillStyle=`rgba(150,40,52,${p.a*0.35})`;ctx.beginPath();ctx.arc(x,y,p.r+2.2,0,Math.PI*2);ctx.fill();"
+        "const y=(p.sA*h+t*p.v)%(h+16)-8;"
+        "const x=(p.sC*w+Math.sin(t*(0.9+p.sB)+p.sC*6.28)*p.d+w)%w;"
+        "const ao=p.a/255;"
+        "ctx.fillStyle=`rgba(255,255,255,${ao/3})`;ctx.beginPath();ctx.arc(x,y,p.r+0.8,0,Math.PI*2);ctx.fill();"
+        "ctx.fillStyle=`rgba(255,255,255,${ao})`;ctx.beginPath();ctx.arc(x,y,p.r,0,Math.PI*2);ctx.fill();"
+        "if(i%4===0){ctx.strokeStyle=`rgba(255,255,255,${ao/2})`;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y-3);ctx.lineTo(x,y+3);ctx.stroke();}"
         "}"
         "requestAnimationFrame(frame);}"
         "requestAnimationFrame(frame);"
@@ -338,10 +391,6 @@ std::string GenerateHtmlReport(const scanner::ScanSummary& summary, const std::s
     std::ofstream out(outPath, std::ios::trunc);
     out << html;
     return std::filesystem::absolute(std::filesystem::path(outPath)).string();
-}
-
-std::string GenerateMacroHtmlReport(const scanner::MacroScanSummary& summary, const std::string& outPath) {
-    return outPath;
 }
 
 void OpenInDefaultBrowser(const std::string& path) {

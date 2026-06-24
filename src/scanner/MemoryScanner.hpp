@@ -26,7 +26,6 @@ struct Detection {
 };
 
 struct ScanOptions {
-    bool deepScan{false};
     std::string generatedBy;
 };
 

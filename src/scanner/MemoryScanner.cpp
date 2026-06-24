@@ -269,6 +269,7 @@ struct ClientSignatureGroup {
 
 const std::vector<ClientSignatureGroup> kClientSignatureGroups = {
     // like this { "Argon Client", { "dev/lvstrng/argon/", "another-string-if-needed-for-better-detection" }},
+    // same goes for ofuscators
 };
 
 const std::unordered_set<std::string> kYellowLookup = [] {
@@ -327,7 +328,7 @@ void MemoryScanner::Start(uint32_t pid, const ScanOptions& options, std::string 
     m_summary = {};
     m_summary.pid = pid;
     m_summary.processStartTime = std::move(processStartTime);
-    m_summary.scanType = options.deepScan ? "Deep" : "Normal";
+    m_summary.scanType = "Full";
     m_summary.generatedBy = options.generatedBy;
 
     m_worker = std::thread(&MemoryScanner::Worker, this, pid, options, m_summary.processStartTime);
@@ -468,7 +469,7 @@ void MemoryScanner::Worker(uint32_t pid, ScanOptions options, std::string proces
     uintptr_t address = reinterpret_cast<uintptr_t>(si.lpMinimumApplicationAddress);
     const uintptr_t endAddress = reinterpret_cast<uintptr_t>(si.lpMaximumApplicationAddress);
 
-    const auto& signatures = options.deepScan ? DeepScanStrings() : NormalScanStrings();
+    const auto& signatures = DeepScanStrings();
 
     std::vector<CompiledSignature> compiled;
     compiled.reserve(signatures.size() + kClientSignatureGroups.size() * 8 +
@@ -495,9 +496,6 @@ void MemoryScanner::Worker(uint32_t pid, ScanOptions options, std::string proces
 
     for (const auto& group : kClientSignatureGroups) {
         bool isObfuscationGroup = (std::string(group.label).find("Obfuscator") != std::string::npos);
-        if (isObfuscationGroup && !options.deepScan) {
-            continue;
-        }
         Severity groupSeverity = isObfuscationGroup ? Severity::Suspicious : Severity::Detect;
         for (const auto& sig : group.signatures) {
             const std::string low = ToLower(sig);
@@ -506,7 +504,6 @@ void MemoryScanner::Worker(uint32_t pid, ScanOptions options, std::string proces
             }
         }
     }
-
 
     for (const auto& sig : kDNSCacheDetections) {
         const std::string low = ToLower(sig);
@@ -522,12 +519,10 @@ void MemoryScanner::Worker(uint32_t pid, ScanOptions options, std::string proces
         }
     }
 
-    if (options.deepScan) {
-        for (const auto& sig : kFullwidthObfuscatedCheats) {
-            const std::string low = ToLower(sig);
-            if (!low.empty()) {
-                compiled.push_back({sig + " (Fullwidth Obfuscated)", low, Severity::Warning, low[0]});
-            }
+    for (const auto& sig : kFullwidthObfuscatedCheats) {
+        const std::string low = ToLower(sig);
+        if (!low.empty()) {
+            compiled.push_back({sig + " (Fullwidth Obfuscated)", low, Severity::Warning, low[0]});
         }
     }
 
@@ -551,7 +546,7 @@ void MemoryScanner::Worker(uint32_t pid, ScanOptions options, std::string proces
     }
 
     if (totalBytes <= 0.0 || regions.empty()) {
-        m_summary = ScanSummary{pid, processStartTime, options.deepScan ? "deep" : "normal"};
+        m_summary = ScanSummary{pid, processStartTime, "full"};
         m_summary.generatedBy = options.generatedBy;
         m_progress.store(1.0f);
         m_running.store(false);
@@ -560,31 +555,36 @@ void MemoryScanner::Worker(uint32_t pid, ScanOptions options, std::string proces
     }
 
     std::vector<std::thread> threads;
-    std::vector<ScanSummary> threadSummaries(config.threadCount, ScanSummary{pid, processStartTime, options.deepScan ? "deep" : "normal"});
+    std::vector<ScanSummary> threadSummaries(config.threadCount, ScanSummary{pid, processStartTime, "full"});
     for (auto& summary : threadSummaries) {
         summary.generatedBy = options.generatedBy;
     }
-    double doneBytes = 0.0;
-    std::mutex progressMutex;
+
+    std::atomic<double> doneBytes{0.0};
 
     AhoCorasick ac;
     for (size_t i = 0; i < compiled.size(); i++)
         ac.AddPattern(compiled[i].lowered, static_cast<int>(i));
     ac.Build();
 
-    AhoCorasick acNorm;
-    for (size_t i = 0; i < compiled.size(); i++)
-        acNorm.AddPattern(compiled[i].lowered, static_cast<int>(i));
-    acNorm.Build();
+    std::atomic<size_t> nextRegion{0};
 
-    auto scanRegion = [&](int threadId, const std::vector<MemoryRegion>& threadRegions) {
+    auto scanRegion = [&](int threadId) {
         ScanSummary& localSummary = threadSummaries[threadId];
+
         std::vector<char> buffer(config.chunkSize);
+        std::string lowerChunk;
+        std::string normalizedChunk;
+        lowerChunk.reserve(config.chunkSize);
+        normalizedChunk.reserve(config.chunkSize);
+
         std::vector<bool> hitFlags(compiled.size(), false);
 
-        for (const auto& region : threadRegions) {
+        size_t idx;
+        while ((idx = nextRegion.fetch_add(1, std::memory_order_relaxed)) < regions.size()) {
             if (m_cancel.load()) break;
 
+            const auto& region = regions[idx];
             uintptr_t regionAddr = region.baseAddress;
             size_t remaining = region.size;
 
@@ -596,87 +596,56 @@ void MemoryScanner::Worker(uint32_t pid, ScanOptions options, std::string proces
                     reinterpret_cast<LPCVOID>(regionAddr),
                     buffer.data(), toRead, &bytesRead) && bytesRead > 0) {
 
-                    std::string lowerChunk(bytesRead, '\0');
+                    lowerChunk.resize(bytesRead);
                     for (SIZE_T i = 0; i < bytesRead; ++i)
                         lowerChunk[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(buffer[i])));
 
-                    std::string normalizedChunk = NormalizeFullwidthUnicode(lowerChunk);
-                    for (auto& c : normalizedChunk)
-                        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    normalizedChunk = NormalizeFullwidthUnicode(lowerChunk);
 
                     std::fill(hitFlags.begin(), hitFlags.end(), false);
 
-                    ac.Search(lowerChunk.data(), lowerChunk.size(), [&](int idx) {
-                        if (!hitFlags[idx]) {
-                            hitFlags[idx] = true;
+                    ac.Search(lowerChunk.data(), lowerChunk.size(), [&](int i) {
+                        if (!hitFlags[i]) {
+                            hitFlags[i] = true;
                             RegisterDetection(localSummary,
-                                compiled[idx].original + " Found",
-                                compiled[idx].severity,
+                                compiled[i].original + " Found",
+                                compiled[i].severity,
                                 regionAddr, region.baseAddress);
                         }
                     });
 
                     if (lowerChunk != normalizedChunk) {
-                        acNorm.Search(normalizedChunk.data(), normalizedChunk.size(), [&](int idx) {
-                            if (!hitFlags[idx]) {
-                                hitFlags[idx] = true;
+                        ac.Search(normalizedChunk.data(), normalizedChunk.size(), [&](int i) {
+                            if (!hitFlags[i]) {
+                                hitFlags[i] = true;
                                 RegisterDetection(localSummary,
-                                    compiled[idx].original + " Found",
-                                    compiled[idx].severity,
+                                    compiled[i].original + " Found",
+                                    compiled[i].severity,
                                     regionAddr, region.baseAddress);
                             }
                         });
                     }
 
-                    if (options.deepScan) {
-                        if (lowerChunk.find(".client.mixins.json") != std::string::npos &&
-                            (lowerChunk.find("fabric-events-interaction-v0") != std::string::npos ||
-                             lowerChunk.find("mixin") != std::string::npos)) {
-                            RegisterDetection(localSummary, "Client mixin JSON file Found", Severity::Suspicious,
-                                regionAddr, region.baseAddress);
-                        }
-                        if (lowerChunk.find("dev.jnic/") != std::string::npos ||
-                            lowerChunk.find("jnic") != std::string::npos) {
-                            RegisterDetection(localSummary, "Jnic obfuscator Found", Severity::Suspicious,
-                                regionAddr, region.baseAddress);
-                        }
-                        if (lowerChunk.find("base64") != std::string::npos &&
-                            (lowerChunk.find("obfusc") != std::string::npos ||
-                             lowerChunk.find("encod") != std::string::npos)) {
-                            RegisterDetection(localSummary, "Base64 obfuscation Found", Severity::Suspicious,
-                                regionAddr, region.baseAddress);
-                        }
+                    if (lowerChunk.find(".client.mixins.json") != std::string::npos &&
+                        (lowerChunk.find("fabric-events-interaction-v0") != std::string::npos ||
+                         lowerChunk.find("mixin") != std::string::npos)) {
+                        RegisterDetection(localSummary, "Client mixin JSON file Found", Severity::Suspicious,
+                            regionAddr, region.baseAddress);
                     }
                 }
 
                 regionAddr += toRead;
                 remaining -= toRead;
-                {
-                    std::lock_guard<std::mutex> lock(progressMutex);
-                    doneBytes += static_cast<double>(toRead);
-                }
 
-                const double p = doneBytes / totalBytes;
+                doneBytes.fetch_add(static_cast<double>(toRead), std::memory_order_relaxed);
+                const double p = doneBytes.load(std::memory_order_relaxed) / totalBytes;
                 m_progress.store(static_cast<float>(std::clamp(p, 0.0, 1.0)));
             }
         }
     };
 
-    size_t regionsPerThread = regions.size() / config.threadCount;
-    size_t extraRegions = regions.size() % config.threadCount;
-
-    size_t regionIndex = 0;
-    for (int t = 0; t < config.threadCount; ++t) {
-        size_t threadRegionCount = regionsPerThread + (t < extraRegions ? 1 : 0);
-        std::vector<MemoryRegion> threadRegions;
-        threadRegions.reserve(threadRegionCount);
-        for (size_t i = 0; i < threadRegionCount; ++i) {
-            threadRegions.push_back(regions[regionIndex + i]);
-        }
-        regionIndex += threadRegionCount;
-
-        threads.emplace_back(scanRegion, t, std::move(threadRegions));
-    }
+    for (int t = 0; t < config.threadCount; ++t)
+        threads.emplace_back(scanRegion, t);
 
     for (auto& thread : threads) {
         if (thread.joinable()) {
@@ -750,13 +719,13 @@ std::string MemoryScanner::ToLower(std::string value) {
 
 std::vector<std::string> MemoryScanner::CheckWindowsServices() {
     std::vector<std::string> stoppedServices;
-    
+
+    SC_HANDLE scManager = OpenSCManagerA(nullptr, nullptr, SC_MANAGER_CONNECT);
+    if (!scManager) {
+        return stoppedServices;
+    }
+
     for (const auto& serviceName : kWindowsServiceChecks) {
-        SC_HANDLE scManager = OpenSCManagerA(nullptr, nullptr, SC_MANAGER_CONNECT);
-        if (!scManager) {
-            continue;
-        }
-        
         SC_HANDLE service = OpenServiceA(scManager, serviceName.c_str(), SERVICE_QUERY_STATUS);
         if (service) {
             SERVICE_STATUS status;
@@ -769,10 +738,9 @@ std::vector<std::string> MemoryScanner::CheckWindowsServices() {
         } else {
             stoppedServices.push_back(serviceName + " (Service Not Found)");
         }
-        
-        CloseServiceHandle(scManager);
     }
-    
+
+    CloseServiceHandle(scManager);
     return stoppedServices;
 }
 

@@ -116,7 +116,6 @@ void JavaApp::StartScan() {
     }
     m_lastError.clear();
     scanner::ScanOptions options{};
-    options.deepScan = m_deepScan;
     const auto& sel = m_processes[static_cast<std::size_t>(m_selectedProcess)];
     m_scanner.Start(sel.pid, options, sel.startTime);
     m_view = ViewState::Scanning;
@@ -171,7 +170,7 @@ void JavaApp::DrawTitleBar() {
     const ImVec2 wp = ImGui::GetWindowPos();
 
     ImGui::SetCursorPos(ImVec2(10.0f, 7.0f));
-    ImGui::TextColored(ImVec4(0.45f, 0.44f, 0.54f, 1.0f), "v1.5");
+    ImGui::TextColored(ImVec4(0.45f, 0.44f, 0.54f, 1.0f), "v1.6");
 
     ImGui::SetWindowFontScale(1.06f);
     const char*  title = "P1AE javaw";
@@ -325,9 +324,6 @@ void JavaApp::DrawMainWindow(float dt) {
         dl->AddLine(ImVec2(wp.x + padX, wp.y + bottomY - 3.0f),
                     ImVec2(wp.x + cardSz.x - padX, wp.y + bottomY - 3.0f),
                     IM_COL32(180, 180, 180, 22), 1.0f);
-
-        ImGui::SetCursorPos(ImVec2(padX, bottomY - 24.0f));
-        Toggle("Deep Scan (BETA)", &m_deepScan);
 
         const bool processSelected = (m_selectedProcess >= 0);
 
